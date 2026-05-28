@@ -51,7 +51,7 @@ struct RTSMAPFORGERUNTIME_API FRTSChokeInfo
     int32 WidthCells = 0;
 
     UPROPERTY()
-    TArray<FIntPoint> Cells;
+    TArray<int32> Cells;
 
     UPROPERTY()
     int32 RegionA = INDEX_NONE;
@@ -90,8 +90,15 @@ struct RTSMAPFORGERUNTIME_API FRTSMapMetadata
     TArray<FRTSChokeInfo> Chokes;
 
     UPROPERTY()
-    TArray<FIntPoint> HighGroundCells;
+    TArray<int32> HighGroundCells;
 
     UPROPERTY()
-    TMap<int32, float> RegionSizes; // RegionID -> cell count
+    TMap<int32, int32> RegionSizes; // RegionID -> cell count
+
+    // FIX Minor: Stage 12 (A* Pathfinding) now stores computed rush distances here
+    // so Stage 16 / 16b validation can read them without re-running A* a second time.
+    // Key:   packed pair (BaseIndexA << 16 | BaseIndexB)  where A < B
+    // Value: A* path cost in grid units, or -1.0f if unreachable
+    UPROPERTY()
+    TMap<int64, float> RushDistances;
 };

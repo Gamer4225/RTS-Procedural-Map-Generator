@@ -30,9 +30,9 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
     }
     CurrentOverlayOption = OverlayOptions[static_cast<int32>(ERTSDebugOverlayMode::Heightmap)];
 
-    PreviewBrush.DrawAs = ESlateBrushDrawType::Image;
-    PreviewBrush.Tiling = ESlateBrushTileType::NoTile;
-    PreviewBrush.Mirror = ESlateBrushMirrorType::NoMirror;
+    PreviewBrush.DrawAs  = ESlateBrushDrawType::Image;
+    PreviewBrush.Tiling  = ESlateBrushTileType::NoTile;
+    PreviewBrush.Mirror  = ESlateBrushMirrorType::NoMirror;
     PreviewBrush.ImageSize = PreviewDesiredSize;
 
     ChildSlot
@@ -51,6 +51,21 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                 .Font(FAppStyle::GetFontStyle("HeadingSmall"))
             ]
 
+            // === GENERATING INDICATOR ===
+            + SVerticalBox::Slot().AutoHeight().Padding(0, 2)
+            [
+                SNew(STextBlock)
+                .Text_Lambda([this]() -> FText
+                {
+                    if (Subsystem.IsValid() && Subsystem->IsGenerating())
+                    {
+                        return LOCTEXT("Generating", "⏳ Generating map… please wait.");
+                    }
+                    return FText::GetEmpty();
+                })
+                .ColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.85f, 0.0f)))
+            ]
+
             // === PRESET & SEED ===
             + SVerticalBox::Slot().AutoHeight().Padding(0, 2)
             [
@@ -62,10 +77,14 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                 + SHorizontalBox::Slot().FillWidth(1.0f).VAlign(VAlign_Center)
                 [
                     SNew(SEditableTextBox)
-                    .Text_Lambda([this]() -> FText {
-                        return Settings.IsValid() ? FText::FromString(FString::Printf(TEXT("%lld"), Settings->Seed)) : FText::GetEmpty();
+                    .Text_Lambda([this]() -> FText
+                    {
+                        return Settings.IsValid()
+                            ? FText::FromString(FString::Printf(TEXT("%lld"), Settings->Seed))
+                            : FText::GetEmpty();
                     })
-                    .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type) {
+                    .OnTextCommitted_Lambda([this](const FText& NewText, ETextCommit::Type)
+                    {
                         if (Settings.IsValid()) Settings->Seed = FCString::Atoi64(*NewText.ToString());
                     })
                 ]
@@ -73,7 +92,11 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                 [
                     SNew(SButton)
                     .Text(LOCTEXT("Randomize", "🎲"))
-                    .OnClicked_Lambda([this]() -> FReply { OnRandomizeSeedClicked(); return FReply::Handled(); })
+                    .OnClicked_Lambda([this]() -> FReply
+                    {
+                        OnRandomizeSeedClicked();
+                        return FReply::Handled();
+                    })
                 ]
             ]
 
@@ -89,11 +112,17 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                 [
                     SNew(SNumericEntryBox<int32>)
                     .MinValue(16).MaxValue(1024).MaxSliderValue(512)
-                    .Value_Lambda([this]() -> TOptional<int32> {
+                    .Value_Lambda([this]() -> TOptional<int32>
+                    {
                         return Settings.IsValid() ? TOptional<int32>(Settings->GridWidth) : TOptional<int32>();
                     })
-                    .OnValueCommitted_Lambda([this](int32 NewVal, ETextCommit::Type) {
-                        if (Settings.IsValid()) { Settings->GridWidth = NewVal; Settings->GridHeight = NewVal; }
+                    .OnValueCommitted_Lambda([this](int32 NewVal, ETextCommit::Type)
+                    {
+                        if (Settings.IsValid())
+                        {
+                            Settings->GridWidth  = NewVal;
+                            Settings->GridHeight = NewVal;
+                        }
                     })
                 ]
             ]
@@ -113,10 +142,12 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                     [
                         SNew(SNumericEntryBox<int32>)
                         .MinValue(2).MaxValue(12)
-                        .Value_Lambda([this]() -> TOptional<int32> {
+                        .Value_Lambda([this]() -> TOptional<int32>
+                        {
                             return Settings.IsValid() ? TOptional<int32>(Settings->NumPlayers) : TOptional<int32>();
                         })
-                        .OnValueCommitted_Lambda([this](int32 NewVal, ETextCommit::Type) {
+                        .OnValueCommitted_Lambda([this](int32 NewVal, ETextCommit::Type)
+                        {
                             if (Settings.IsValid()) Settings->NumPlayers = NewVal;
                         })
                     ]
@@ -132,10 +163,12 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                     [
                         SNew(SNumericEntryBox<float>)
                         .MinValue(0.0f).MaxValue(1.0f)
-                        .Value_Lambda([this]() -> TOptional<float> {
+                        .Value_Lambda([this]() -> TOptional<float>
+                        {
                             return Settings.IsValid() ? TOptional<float>(Settings->SymmetryStrength) : TOptional<float>();
                         })
-                        .OnValueCommitted_Lambda([this](float NewVal, ETextCommit::Type) {
+                        .OnValueCommitted_Lambda([this](float NewVal, ETextCommit::Type)
+                        {
                             if (Settings.IsValid()) Settings->SymmetryStrength = NewVal;
                         })
                     ]
@@ -147,8 +180,23 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
             [
                 SNew(SButton)
                 .HAlign(HAlign_Center)
-                .Text(LOCTEXT("Generate", "GENERATE MAP"))
-                .OnClicked_Lambda([this]() -> FReply { OnGenerateClicked(); return FReply::Handled(); })
+                .Text_Lambda([this]() -> FText
+                {
+                    // FIX Problem 1: Disable button and show label while generating.
+                    return (Subsystem.IsValid() && Subsystem->IsGenerating())
+                        ? LOCTEXT("Generating_Btn", "Generating…")
+                        : LOCTEXT("Generate", "GENERATE MAP");
+                })
+                .IsEnabled_Lambda([this]() -> bool
+                {
+                    // Disable while async generation is in progress
+                    return !(Subsystem.IsValid() && Subsystem->IsGenerating());
+                })
+                .OnClicked_Lambda([this]() -> FReply
+                {
+                    OnGenerateClicked();
+                    return FReply::Handled();
+                })
             ]
 
             // === OVERLAY MODE ===
@@ -169,7 +217,8 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                         SNew(STextBlock)
                         .Text(this, &SRTSMapGeneratorWindow::GetCurrentOverlayText)
                     ]
-                    .OnGenerateWidget_Lambda([this](TSharedPtr<FString> Opt) -> TSharedRef<SWidget> {
+                    .OnGenerateWidget_Lambda([this](TSharedPtr<FString> Opt) -> TSharedRef<SWidget>
+                    {
                         return SNew(STextBlock).Text(FText::FromString(*Opt.Get()));
                     })
                 ]
@@ -200,7 +249,8 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                     .HeightOverride_Lambda([this]() -> FOptionalSize { return FOptionalSize(PreviewDesiredSize.Y); })
                     [
                         SNew(SImage)
-                        .Image_Lambda([this]() -> const FSlateBrush* {
+                        .Image_Lambda([this]() -> const FSlateBrush*
+                        {
                             if (Subsystem.IsValid() && Subsystem->GetPreviewTexture())
                             {
                                 PreviewBrush.SetResourceObject(Subsystem->GetPreviewTexture());
@@ -216,19 +266,18 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
             + SVerticalBox::Slot().AutoHeight().Padding(0, 4)
             [
                 SNew(STextBlock)
-                .Text_Lambda([this]() -> FText {
-                    return FText::FromString(ScoreText);
-                })
-                .ColorAndOpacity_Lambda([this]() -> FSlateColor {
-                    return Subsystem.IsValid() && Subsystem->GetLastValidation().bPassed ? FSlateColor(FLinearColor::Green) : FSlateColor(FLinearColor::Yellow);
+                .Text_Lambda([this]() -> FText { return FText::FromString(ScoreText); })
+                .ColorAndOpacity_Lambda([this]() -> FSlateColor
+                {
+                    return Subsystem.IsValid() && Subsystem->GetLastValidation().bPassed
+                        ? FSlateColor(FLinearColor::Green)
+                        : FSlateColor(FLinearColor::Yellow);
                 })
             ]
             + SVerticalBox::Slot().AutoHeight().Padding(0, 2)
             [
                 SNew(STextBlock)
-                .Text_Lambda([this]() -> FText {
-                    return FText::FromString(ValidationText);
-                })
+                .Text_Lambda([this]() -> FText { return FText::FromString(ValidationText); })
                 .ColorAndOpacity(FSlateColor(FLinearColor(0.6f, 0.6f, 0.6f)))
             ]
 
@@ -240,7 +289,8 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                 [
                     SNew(SButton)
                     .Text(LOCTEXT("ExportJSON", "Export JSON"))
-                    .OnClicked_Lambda([this]() -> FReply {
+                    .OnClicked_Lambda([this]() -> FReply
+                    {
                         if (Subsystem.IsValid()) Subsystem->ExportMetadataToJSON();
                         return FReply::Handled();
                     })
@@ -249,7 +299,8 @@ void SRTSMapGeneratorWindow::Construct(const FArguments& InArgs)
                 [
                     SNew(SButton)
                     .Text(LOCTEXT("CycleOverlay", "Cycle Overlay"))
-                    .OnClicked_Lambda([this]() -> FReply {
+                    .OnClicked_Lambda([this]() -> FReply
+                    {
                         if (Subsystem.IsValid())
                         {
                             Subsystem->CycleOverlayMode();
@@ -272,11 +323,15 @@ void SRTSMapGeneratorWindow::Tick(const FGeometry& AllottedGeometry, const doubl
     if (Subsystem.IsValid())
     {
         bool bHasGrid = Subsystem->HasValidGrid();
-        if (bHasGrid != bLastHadGrid)
+
+        // Refresh readouts when generation completes (grid transitions from invalid→valid)
+        // or when the generating flag drops (async job finished).
+        if (bHasGrid != bLastHadGrid || (!Subsystem->IsGenerating() && bWasGenerating))
         {
             RefreshReadouts();
             bLastHadGrid = bHasGrid;
         }
+        bWasGenerating = Subsystem->IsGenerating();
     }
 }
 
@@ -288,30 +343,30 @@ void SRTSMapGeneratorWindow::InitializeSettings()
     }
 
     Settings = NewObject<URTSGenerationSettings>(GetTransientPackage());
-    Settings->GridWidth = 256;
-    Settings->GridHeight = 256;
-    Settings->bRandomSeed = true;  // Default to random seed; pipeline resolves once
-    Settings->Seed = 0;
-    Settings->NumPlayers = 2;
+    Settings->GridWidth       = 256;
+    Settings->GridHeight      = 256;
+    Settings->bRandomSeed     = true;
+    Settings->Seed            = 0;
+    Settings->NumPlayers      = 2;
     Settings->SymmetryStrength = 1.0f;
-    Settings->NumExpansions = 3;
+    Settings->NumExpansions   = 3;
 }
 
 void SRTSMapGeneratorWindow::RefreshReadouts()
 {
     if (!Subsystem.IsValid())
     {
-        ScoreText = TEXT("Subsystem not ready");
+        ScoreText      = TEXT("Subsystem not ready");
         ValidationText = TEXT("");
         return;
     }
 
-    const FRTSValidationResult& Val = Subsystem->GetLastValidation();
-    const FRTSMapMetadata& Meta = Subsystem->GetLastMetadata();
+    const FRTSValidationResult& Val  = Subsystem->GetLastValidation();
+    const FRTSMapMetadata&      Meta = Subsystem->GetLastMetadata();
 
     if (!Subsystem->HasValidGrid())
     {
-        ScoreText = TEXT("No map generated yet.");
+        ScoreText      = TEXT("No map generated yet.");
         ValidationText = TEXT("Click GENERATE MAP to start.");
         return;
     }
@@ -336,7 +391,7 @@ void SRTSMapGeneratorWindow::RefreshReadouts()
 
     if (Meta.GridWidth > 0 && Meta.GridHeight > 0)
     {
-        float Aspect = static_cast<float>(Meta.GridHeight) / static_cast<float>(Meta.GridWidth);
+        float Aspect       = static_cast<float>(Meta.GridHeight) / static_cast<float>(Meta.GridWidth);
         PreviewDesiredSize = FVector2D(256.0f, 256.0f * Aspect);
         PreviewBrush.ImageSize = PreviewDesiredSize;
     }
@@ -344,21 +399,15 @@ void SRTSMapGeneratorWindow::RefreshReadouts()
 
 void SRTSMapGeneratorWindow::OnGenerateClicked()
 {
-    if (Subsystem.IsValid() && Settings.IsValid())
-    {
-        Subsystem->GenerateMap(Settings);
-        
-        // After generation, sync the displayed seed to what was actually resolved.
-        // The pipeline resolved it deterministically; reflect that in the UI.
-        const FRTSMapMetadata& Meta = Subsystem->GetLastMetadata();
-        if (Meta.Seed != 0)
-        {
-            Settings->Seed = Meta.Seed;
-            Settings->bRandomSeed = false;
-        }
-        
-        RefreshReadouts();
-    }
+    if (!Subsystem.IsValid() || !Settings.IsValid()) { return; }
+    if (Subsystem->IsGenerating()) { return; } // Guard: ignore clicks while busy
+
+    Subsystem->GenerateMap(Settings.Get());
+
+    // NOTE: Because generation is now async, the seed/metadata is NOT yet updated
+    // at this point. RefreshReadouts() is called in Tick() when IsGenerating()
+    // transitions back to false, at which point the resolved seed is reflected in
+    // the metadata and synced to the UI.
 }
 
 void SRTSMapGeneratorWindow::OnRandomizeSeedClicked()
@@ -367,17 +416,13 @@ void SRTSMapGeneratorWindow::OnRandomizeSeedClicked()
     {
         // CRITICAL: Do NOT call Settings->ResolveSeed() here.
         // ResolveSeed() must be called EXACTLY ONCE inside the pipeline.
-        // 
-        // Instead, we set bRandomSeed=true and leave Seed=0 (or any value).
-        // The pipeline will resolve the actual random seed once during generation,
-        // and then we sync the resolved value back to the UI via OnGenerateClicked().
         //
-        // This prevents:
-        //   - Pre-resolving a seed that doesn't match the pipeline's resolution
-        //   - Double-calling ResolveSeed() (which would return different values)
-        //   - UI seed display diverging from actual generated map seed
+        // Set bRandomSeed=true and leave Seed at 0. The pipeline resolves the
+        // actual seed on the background thread and stores it in OutMetadata.Seed.
+        // After async completion, Tick() calls RefreshReadouts() which syncs the
+        // resolved seed back to the UI via LastMetadata.Seed.
         Settings->bRandomSeed = true;
-        Settings->Seed = 0; // Ignored when bRandomSeed=true; pipeline will resolve
+        Settings->Seed        = 0; // Ignored when bRandomSeed=true
     }
 }
 
@@ -416,7 +461,9 @@ ECheckBoxState SRTSMapGeneratorWindow::GetViewportOverlayState() const
 
 FText SRTSMapGeneratorWindow::GetCurrentOverlayText() const
 {
-    return CurrentOverlayOption.IsValid() ? FText::FromString(*CurrentOverlayOption.Get()) : FText::GetEmpty();
+    return CurrentOverlayOption.IsValid()
+        ? FText::FromString(*CurrentOverlayOption.Get())
+        : FText::GetEmpty();
 }
 
 TSharedRef<SWidget> SRTSMapGeneratorWindow::MakeOverlayOptionWidget(TSharedPtr<FString> InOption)
@@ -428,19 +475,19 @@ FString SRTSMapGeneratorWindow::OverlayModeToString(ERTSDebugOverlayMode Mode)
 {
     switch (Mode)
     {
-        case ERTSDebugOverlayMode::None:           return TEXT("None");
-        case ERTSDebugOverlayMode::Heightmap:       return TEXT("Heightmap");
-        case ERTSDebugOverlayMode::WaterCliff:      return TEXT("Water & Cliffs");
-        case ERTSDebugOverlayMode::Walkable:        return TEXT("Walkable");
-        case ERTSDebugOverlayMode::Buildable:       return TEXT("Buildable");
-        case ERTSDebugOverlayMode::Slope:          return TEXT("Slope");
-        case ERTSDebugOverlayMode::Regions:         return TEXT("Regions");
-        case ERTSDebugOverlayMode::Biomes:          return TEXT("Biomes");
-        case ERTSDebugOverlayMode::TacticalZones:   return TEXT("Tactical Zones");
-        case ERTSDebugOverlayMode::Influence:       return TEXT("Influence Map");
-        case ERTSDebugOverlayMode::CombatHeat:      return TEXT("Combat Heat");
-        case ERTSDebugOverlayMode::ChokePoints:     return TEXT("Choke Points");
-        default:                                    return TEXT("Unknown");
+    case ERTSDebugOverlayMode::None:          return TEXT("None");
+    case ERTSDebugOverlayMode::Heightmap:     return TEXT("Heightmap");
+    case ERTSDebugOverlayMode::WaterCliff:    return TEXT("Water & Cliffs");
+    case ERTSDebugOverlayMode::Walkable:      return TEXT("Walkable");
+    case ERTSDebugOverlayMode::Buildable:     return TEXT("Buildable");
+    case ERTSDebugOverlayMode::Slope:         return TEXT("Slope");
+    case ERTSDebugOverlayMode::Regions:       return TEXT("Regions");
+    case ERTSDebugOverlayMode::Biomes:        return TEXT("Biomes");
+    case ERTSDebugOverlayMode::TacticalZones: return TEXT("Tactical Zones");
+    case ERTSDebugOverlayMode::Influence:     return TEXT("Influence Map");
+    case ERTSDebugOverlayMode::CombatHeat:    return TEXT("Combat Heat");
+    case ERTSDebugOverlayMode::ChokePoints:   return TEXT("Choke Points");
+    default:                                   return TEXT("Unknown");
     }
 }
 

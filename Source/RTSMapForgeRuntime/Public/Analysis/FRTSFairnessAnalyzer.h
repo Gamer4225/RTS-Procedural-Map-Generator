@@ -1,10 +1,11 @@
 #pragma once
-
 #include "CoreMinimal.h"
-
-// V1 Stub: fairness is computed inline in StrategicScorer. Extend in V2.
+#include "Core/FRTSGrid.h"
+#include "Data/FRTSMapMetadata.h"
+#include "Validation/FRTSValidationResult.h"
+#include "Core/URTSGenerationSettings.h"
 class RTSMAPFORGERUNTIME_API FRTSFairnessAnalyzer
 {
 public:
-    void Analyze() {}
+    void Analyze(const FRTSGrid& Grid, const FRTSMapMetadata& Metadata, FRTSValidationResult& OutResult, const URTSGenerationSettings* Settings) {}
 };

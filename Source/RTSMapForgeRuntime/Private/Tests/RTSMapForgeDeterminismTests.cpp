@@ -1,3 +1,10 @@
+// FIX Problem 3: Entire test file is now wrapped in WITH_DEV_AUTOMATION_TESTS.
+// Previously these tests compiled unconditionally, meaning they could be
+// included in packaged game builds — a Fab certification concern.
+// WITH_DEV_AUTOMATION_TESTS is only true in Editor + non-shipping builds,
+// so the test binary never ships with the packaged plugin.
+#if WITH_DEV_AUTOMATION_TESTS
+
 #include "Misc/AutomationTest.h"
 #include "Core/FRTSGrid.h"
 #include "Core/FRTSSeedManager.h"
@@ -8,7 +15,8 @@
 
 // ============================================
 // UE AUTOMATION TEST SUITE
-// Compile with: RunUAT BuildPlugin ... or Editor → Session Frontend → Automation
+// Run via: Editor → Tools → Session Frontend → Automation
+//       or: RunUAT BuildPlugin ... -test
 // ============================================
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRTSMapForge_Determinism_Noise,
@@ -25,7 +33,6 @@ bool FRTSMapForge_Determinism_Noise::RunTest(const FString& Parameters)
     NoiseA.Initialize(TestSeed);
     NoiseB.Initialize(TestSeed);
 
-    // Sample multiple points
     for (float X = 0.0f; X <= 10.0f; X += 1.25f)
     {
         for (float Y = 0.0f; Y <= 10.0f; Y += 1.25f)
@@ -58,9 +65,9 @@ bool FRTSMapForge_Determinism_FBM::RunTest(const FString& Parameters)
     NoiseA.Initialize(Seed);
     NoiseB.Initialize(Seed);
 
-    const int32 Octaves = 6;
+    const int32 Octaves     = 6;
     const float Persistence = 0.5f;
-    const float Lacunarity = 2.0f;
+    const float Lacunarity  = 2.0f;
 
     for (float X = 0.0f; X <= 5.0f; X += 0.5f)
     {
@@ -121,28 +128,23 @@ bool FRTSMapForge_Determinism_FullPipeline::RunTest(const FString& Parameters)
     URTSGenerationSettings* SettingsA = NewObject<URTSGenerationSettings>();
     URTSGenerationSettings* SettingsB = NewObject<URTSGenerationSettings>();
 
-    // Identical settings
-    SettingsA->GridWidth = 128;
-    SettingsA->GridHeight = 128;
-    SettingsA->Seed = 999888;
-    SettingsA->bRandomSeed = false;
-    SettingsA->FBMOctaves = 6;
+    SettingsA->GridWidth      = 128;
+    SettingsA->GridHeight     = 128;
+    SettingsA->Seed           = 999888;
+    SettingsA->bRandomSeed    = false;
+    SettingsA->FBMOctaves     = 6;
     SettingsA->FBMPersistence = 0.5f;
-    SettingsA->FBMLacunarity = 2.0f;
-    SettingsA->TerrainScale = 1.0f;
-    SettingsA->WaterLevel = 0.25f;
-    SettingsA->MountainLevel = 0.75f;
-    SettingsA->NumPlayers = 2;
+    SettingsA->FBMLacunarity  = 2.0f;
+    SettingsA->TerrainScale   = 1.0f;
+    SettingsA->WaterLevel     = 0.25f;
+    SettingsA->MountainLevel  = 0.75f;
+    SettingsA->NumPlayers     = 2;
 
-    // Deep copy to B
-    *SettingsB = *SettingsA;
+    *SettingsB = *SettingsA; // Deep copy
 
-    FRTSGrid GridA;
-    FRTSGrid GridB;
-    FRTSMapMetadata MetaA;
-    FRTSMapMetadata MetaB;
-    FRTSValidationResult ValA;
-    FRTSValidationResult ValB;
+    FRTSGrid            GridA, GridB;
+    FRTSMapMetadata     MetaA, MetaB;
+    FRTSValidationResult ValA, ValB;
 
     FRTSGenerationPipeline PipeA;
     FRTSGenerationPipeline PipeB;
@@ -150,10 +152,9 @@ bool FRTSMapForge_Determinism_FullPipeline::RunTest(const FString& Parameters)
     PipeA.Generate(SettingsA, GridA, MetaA, ValA, /*MaxRetries=*/1);
     PipeB.Generate(SettingsB, GridB, MetaB, ValB, /*MaxRetries=*/1);
 
-    // Cell-by-cell height comparison
     TestEqual(TEXT("Grid dimensions match"), GridA.Cells.Num(), GridB.Cells.Num());
-    TestEqual(TEXT("Grid width match"), GridA.Width, GridB.Width);
-    TestEqual(TEXT("Grid height match"), GridA.Height, GridB.Height);
+    TestEqual(TEXT("Grid width match"),      GridA.Width,       GridB.Width);
+    TestEqual(TEXT("Grid height match"),     GridA.Height,      GridB.Height);
 
     int32 MismatchCount = 0;
     for (int32 i = 0; i < GridA.Cells.Num(); ++i)
@@ -176,16 +177,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRTSMapForge_Memory_CellSize,
 
 bool FRTSMapForge_Memory_CellSize::RunTest(const FString& Parameters)
 {
-    // Verify FRTSCell does NOT contain dynamic allocations (no TArray, no FString, no TMap)
-    const SIZE_T CellSize = sizeof(FRTSCell);
-    const SIZE_T MaxExpected = 160; // Generous upper bound; should be much smaller
+    const SIZE_T CellSize   = sizeof(FRTSCell);
+    const SIZE_T MaxExpected = 160;
 
     UE_LOG(LogTemp, Log, TEXT("FRTSCell size: %llu bytes"), static_cast<uint64>(CellSize));
     TestTrue(TEXT("FRTSCell is reasonably small (< 160 bytes)"), CellSize <= MaxExpected);
 
-    // Verify FRTSGrid allocation is predictable
     FRTSGrid Grid(256, 256, 200.0f);
-    SIZE_T Allocated = Grid.GetAllocatedSize();
+    SIZE_T Allocated    = Grid.GetAllocatedSize();
     SIZE_T ExpectedApprox = static_cast<SIZE_T>(256 * 256) * CellSize;
     TestTrue(TEXT("Grid allocation matches cell count"), Allocated >= ExpectedApprox);
 
@@ -200,16 +199,16 @@ bool FRTSMapForge_Grid_BoundsSafety::RunTest(const FString& Parameters)
 {
     FRTSGrid Grid(32, 32, 100.0f);
 
-    // These should crash in Debug / trigger check() in Development with checks enabled
-    // Automation tests run in a guarded context; we test the IsValidCoord boundary
-    TestTrue(TEXT("Valid coord (0,0)"), Grid.IsValidCoord(0, 0));
-    TestTrue(TEXT("Valid coord (31,31)"), Grid.IsValidCoord(31, 31));
+    TestTrue(TEXT("Valid coord (0,0)"),     Grid.IsValidCoord(0, 0));
+    TestTrue(TEXT("Valid coord (31,31)"),   Grid.IsValidCoord(31, 31));
     TestFalse(TEXT("Invalid coord (-1,0)"), Grid.IsValidCoord(-1, 0));
     TestFalse(TEXT("Invalid coord (32,0)"), Grid.IsValidCoord(32, 0));
-    TestFalse(TEXT("Invalid index -1"), Grid.IsValidIndex(-1));
-    TestFalse(TEXT("Invalid index 1024"), Grid.IsValidIndex(1024));
-    TestTrue(TEXT("Valid index 0"), Grid.IsValidIndex(0));
-    TestTrue(TEXT("Valid index 1023"), Grid.IsValidIndex(1023));
+    TestFalse(TEXT("Invalid index -1"),     Grid.IsValidIndex(-1));
+    TestFalse(TEXT("Invalid index 1024"),   Grid.IsValidIndex(1024));
+    TestTrue(TEXT("Valid index 0"),         Grid.IsValidIndex(0));
+    TestTrue(TEXT("Valid index 1023"),      Grid.IsValidIndex(1023));
 
     return true;
 }
+
+#endif // WITH_DEV_AUTOMATION_TESTS

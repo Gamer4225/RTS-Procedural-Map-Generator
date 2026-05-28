@@ -1,3 +1,9 @@
+// RTSMapForgeRuntime.Build.cs
+// FIX Bug 2: Removed invalid "InstancedPlacements" module (does not exist in UE5.3/5.4).
+//            HISM lives in the Engine module which is already a dependency.
+// FIX (Minor): Added "LandscapeEditor" under bBuildEditor so FLandscapeEditDataInterface
+//              resolves correctly in editor builds.
+
 using UnrealBuildTool;
 
 public class RTSMapForgeRuntime : ModuleRules
@@ -15,26 +21,28 @@ public class RTSMapForgeRuntime : ModuleRules
                 "NavigationSystem",
                 "AIModule",
                 "Projects",
-                "Landscape",          // V1: Landscape heightmap bake
-                "InstancedPlacements" // V1: HISM/ISM prop spawning
+                "Landscape"          // Landscape heightmap bake (header access)
+                // NOTE: "InstancedPlacements" removed — it does not exist in UE5.3/5.4.
+                // HierarchicalInstancedStaticMeshComponent is part of "Engine".
             }
         );
 
         PrivateDependencyModuleNames.AddRange(
             new string[]
             {
-                // Landscape edit layer support (editor-only functionality in runtime for baking)
+                // Add private-only static dependencies here as needed
             }
         );
 
-        // Editor-only landscape dependencies (for Landscape Bake in editor builds)
+        // Editor-only landscape write dependencies (for Landscape Bake in editor builds)
         if (Target.bBuildEditor)
         {
             PublicDependencyModuleNames.AddRange(
                 new string[]
                 {
                     "UnrealEd",
-                    "EditorFramework"
+                    "EditorFramework",
+                    "LandscapeEditor"   // FIX: Required for FLandscapeEditDataInterface
                 }
             );
         }

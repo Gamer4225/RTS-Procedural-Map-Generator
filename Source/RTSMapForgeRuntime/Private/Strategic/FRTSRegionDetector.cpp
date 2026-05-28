@@ -3,60 +3,23 @@
 void FRTSRegionDetector::DetectRegions(FRTSGrid& Grid)
 {
     RegionSizes.Reset();
-    const int32 TotalCells = Grid.Cells.Num();
-
-    TArray<bool> Visited;
-    Visited.SetNumZeroed(TotalCells);
-
-    int32 CurrentRegionID = 0;
-
-    // Reusable fixed neighbor buffer (zero allocation per iteration)
-    int32 NeighborBuffer[8];
-
-    for (int32 i = 0; i < TotalCells; ++i)
+    TArray<bool> Visited; Visited.SetNumZeroed(Grid.Cells.Num());
+    int32 ID = 0, NeighborBuffer[8];
+    for (int32 i = 0; i < Grid.Cells.Num(); ++i)
     {
-        if (Visited[i] || !Grid.Cells[i].bWalkable)
-        {
-            continue;
-        }
-
-        // BFS flood fill using a stack array
-        TArray<int32> Stack;
-        Stack.Reserve(64);
-        Stack.Push(i);
-        Visited[i] = true;
-        int32 RegionCellCount = 0;
-
+        if (Visited[i] || !Grid.Cells[i].bWalkable) continue;
+        TArray<int32> Stack; Stack.Reserve(64); Stack.Push(i); Visited[i] = true; int32 Count = 0;
         while (Stack.Num() > 0)
         {
-            int32 Current = Stack.Pop();
-            Grid.Cells[Current].RegionID = CurrentRegionID;
-            ++RegionCellCount;
-
-            // === ZERO-ALLOCATION neighbor lookup (4-dir) ===
-            int32 NumNeighbors = Grid.GetNeighborsFixed(Current, false, NeighborBuffer);
-
-            for (int32 n = 0; n < NumNeighbors; ++n)
-            {
-                int32 Neighbor = NeighborBuffer[n];
-                if (!Visited[Neighbor] && Grid.Cells[Neighbor].bWalkable)
-                {
-                    Visited[Neighbor] = true;
-                    Stack.Push(Neighbor);
-                }
-            }
+            int32 C = Stack.Pop(); Grid.Cells[C].RegionID = ID; ++Count;
+            int32 N = Grid.GetNeighborsFixed(C, false, NeighborBuffer);
+            for (int32 n = 0; n < N; ++n) { int32 NIdx = NeighborBuffer[n]; if (!Visited[NIdx] && Grid.Cells[NIdx].bWalkable) { Visited[NIdx]=true; Stack.Push(NIdx); } }
         }
-
-        RegionSizes.Add(CurrentRegionID, RegionCellCount);
-        ++CurrentRegionID;
+        RegionSizes.Add(ID++, Count);
     }
 }
 
 int32 FRTSRegionDetector::GetRegionCellCount(int32 RegionID) const
 {
-    if (const int32* Count = RegionSizes.Find(RegionID))
-    {
-        return *Count;
-    }
-    return 0;
+    if (const int32* C = RegionSizes.Find(RegionID)) return *C; return 0;
 }

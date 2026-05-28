@@ -1,11 +1,9 @@
 #pragma once
-
 #include "CoreMinimal.h"
 #include "Core/FRTSGrid.h"
-#include "Core/FRTSSeedManager.h"
-#include "Core/URTSGenerationSettings.h"
 #include "Data/FRTSMapMetadata.h"
-
+#include "Core/URTSGenerationSettings.h"
+#include "Core/FRTSSeedManager.h"
 class RTSMAPFORGERUNTIME_API FRTSExpansionPlacer
 {
 public:

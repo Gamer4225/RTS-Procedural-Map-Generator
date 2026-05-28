@@ -6,6 +6,8 @@
 #include "Core/URTSGenerationSettings.h"
 #include "Data/FRTSMapMetadata.h"
 #include "Validation/FRTSValidationResult.h"
+#include "Terrain/FRTSNoiseGenerator.h"   // FIX Bug 1: FRTSNoiseGenerator was used as a
+                                           // member (NoiseGen) but never included. Added here.
 
 /**
  * RAII guard to manage UObject root-set membership.
@@ -44,37 +46,37 @@ private:
 
 /**
  * Master generation pipeline orchestrator.
- * 
+ *
  * CRITICAL ARCHITECTURAL RULES:
- *   1. Seed is resolved EXACTLY ONCE in Generate() and NEVER again anywhere.
- *      All generators receive the resolved seed as an explicit int64 parameter.
- *   2. SeedManager is AddToRoot/RemoveFromRoot scoped to Generate() call ONLY.
- *   3. All stages are deterministic given the same ResolvedSeed + same Settings.
- *   4. No subsystem, generator, or UI code may call Settings->ResolveSeed() except here.
- * 
+ * 1. Seed is resolved EXACTLY ONCE in Generate() and NEVER again anywhere.
+ *    All generators receive the resolved seed as an explicit int64 parameter.
+ * 2. SeedManager is AddToRoot/RemoveFromRoot scoped to Generate() call ONLY.
+ * 3. All stages are deterministic given the same ResolvedSeed + same Settings.
+ * 4. No subsystem, generator, or UI code may call Settings->ResolveSeed() except here.
+ *
  * V1.5 Pipeline (20 stages):
- *   1. Seed Init           → FRandomStream + Perlin permutation
- *   2. Grid Alloc          → flat TArray<FRTSCell>[W*H]
- *   3. Heightmap (FBM)     → Perlin octaves → normalized height
- *   3b. Radial Falloff     → Island shaping
- *   4. Terrain Classify     → Water, Cliff, Buildable
- *   5. Biome Assignment     → Voronoi seeds per biome asset
- *   6. River Generation     → Gradient descent + widening + lateral jitter
- *   6b. Reclassify Rivers  → Update traversal after water carving
- *   6c. Water Validation    → Connectivity check
- *   7. Region Detection     → BFS flood fill
- *   8. Base Placement       → 180° symmetry (2p) + Poisson fallback
- *   9. Expansion Placement  → Risk score by distance
- *   10. Choke Detection      → Region boundary width analysis
- *   10b. Bridge/Crossing Detection ← NEW V1.5: Narrow river crossings
- *   10c. Resource Placement  → Strategic Poisson-disk
- *   11. Tactical Zones      → Priority hierarchy classification
- *   12. A* Pathfinding       → Octile heuristic; rush distances
- *   13. Influence Maps       → Inverse-square control
- *   14. Heatmaps             → Combat/traversal density
- *   15. Strategic Scoring   → Balance, Rush, Choke, Overall
- *   16. Validation          → 6-pass + ResourceAccessibility + WaterConnectivity
- *   16b. Resource Accessibility Validation ← NEW V1.5: path cost + safety parity
+ *  1.  Seed Init       → FRandomStream + Perlin permutation
+ *  2.  Grid Alloc      → flat TArray[W*H]
+ *  3.  Heightmap (FBM) → Perlin octaves → normalized height
+ *  3b. Radial Falloff  → Island shaping
+ *  4.  Terrain Classify→ Water, Cliff, Buildable
+ *  5.  Biome Assignment→ Voronoi seeds per biome asset
+ *  6.  River Generation→ Gradient descent + widening + lateral jitter
+ *  6b. Reclassify Rivers→ Update traversal after water carving
+ *  6c. Water Validation→ Connectivity check
+ *  7.  Region Detection→ BFS flood fill
+ *  8.  Base Placement  → 180° symmetry (2p) + Poisson fallback
+ *  9.  Expansion Placement → Risk score by distance
+ *  10. Choke Detection → Region boundary width analysis
+ *  10b.Bridge/Crossing Detection ← NEW V1.5: Narrow river crossings
+ *  10c.Resource Placement → Strategic Poisson-disk
+ *  11. Tactical Zones  → Priority hierarchy classification
+ *  12. A* Pathfinding  → Octile heuristic; rush distances stored in Metadata.RushDistances
+ *  13. Influence Maps  → Inverse-square control
+ *  14. Heatmaps        → Combat/traversal density
+ *  15. Strategic Scoring → Balance, Rush, Choke, Overall
+ *  16. Validation      → 6-pass + ResourceAccessibility + WaterConnectivity
+ *  16b.Resource Accessibility Validation ← NEW V1.5: path cost + safety parity
  */
 class RTSMAPFORGERUNTIME_API FRTSGenerationPipeline
 {

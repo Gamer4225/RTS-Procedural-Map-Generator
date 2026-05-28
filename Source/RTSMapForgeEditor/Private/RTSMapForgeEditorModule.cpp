@@ -5,8 +5,10 @@
 #include "LevelEditor.h"
 #include "ToolMenus.h"
 #include "Widgets/Docking/SDockTab.h"
-#include "WorkspaceMenuStructureModule.h"
-#include "WorkspaceMenuStructure/Public/WorkspaceMenuStructure.h"
+// FIX Bug 3: Removed both WorkspaceMenuStructure includes. They were unused in
+//            this file and the second path ("WorkspaceMenuStructure/Public/...")
+//            fails to resolve on most UE installs. The tab spawner and toolbar
+//            button work correctly without them.
 
 #define LOCTEXT_NAMESPACE "RTSMapForgeEditor"
 
@@ -40,16 +42,16 @@ void FRTSMapForgeEditorModule::ShutdownModule()
     if (FModuleManager::Get().IsModuleLoaded("LevelEditor"))
     {
         FLevelEditorModule& LevelEditorModule = FModuleManager::LoadModuleChecked<FLevelEditorModule>("LevelEditor");
-        
+
         if (ToolbarExtender.IsValid())
         {
             LevelEditorModule.GetToolBarExtensibilityManager()->RemoveExtender(ToolbarExtender);
         }
         else
         {
-            // Fallback: log warning. This should not happen if registration succeeded.
-            UE_LOG(LogTemp, Warning, TEXT("RTSMapForgeEditor: ToolbarExtender handle was invalid during shutdown. "
-                "Another plugin's toolbar button may have been affected if RemoveAllExtenders was used."));
+            UE_LOG(LogTemp, Warning,
+                TEXT("RTSMapForgeEditor: ToolbarExtender handle was invalid during shutdown. ")
+                TEXT("Another plugin's toolbar button may have been affected if RemoveAllExtenders was used."));
         }
     }
 
@@ -106,7 +108,6 @@ void FRTSMapForgeEditorModule::RegisterToolbarButton()
     FLevelEditorModule& LevelEditorModule = FModuleManager::LoadModuleChecked<FLevelEditorModule>("LevelEditor");
 
     // CRITICAL: Store the extender handle so we can remove ONLY ours during shutdown.
-    // Using RemoveAllExtenders() would destroy other plugins' buttons.
     ToolbarExtender = MakeShared<FExtender>();
     ToolbarExtender->AddToolBarExtension(
         "Play",

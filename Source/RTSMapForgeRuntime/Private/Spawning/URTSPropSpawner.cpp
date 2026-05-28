@@ -14,73 +14,80 @@ bool URTSPropSpawner::SpawnProps(UWorld* World, const FRTSGrid& Grid, const FRTS
         return false;
     }
 
-    // Create manager actor if needed
+    // FIX Bug (Minor): SpawnProps was missing RF_Transient on the manager actor,
+    // while SpawnResourceNodes correctly set it. Both paths now mark the actor
+    // transient so it is never serialized into the level unintentionally.
     if (!ManagerActor || ManagerActor->IsPendingKillPending())
     {
         FActorSpawnParameters Params;
         Params.Name = FName(TEXT("RTSMapForge_PropManager"));
         Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
         ManagerActor = World->SpawnActor<AActor>(AActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+        if (ManagerActor)
+        {
+            // FIX: Mark transient so the manager actor is never saved to disk.
+            ManagerActor->SetFlags(RF_Transient);
+        }
         if (!ManagerActor)
         {
             return false;
         }
     }
 
-    // Clear previous
+    // Clear previous instances before placing new ones
     ClearProps();
 
-    const int32 W = Grid.Width;
-    const int32 H = Grid.Height;
+    const int32 W        = Grid.Width;
+    const int32 H        = Grid.Height;
     const float CellSize = Grid.CellSize;
 
-    // Simple deterministic placement: place on walkable, buildable, non-water cells
-    // V1: basic tree/rock placement. Biome-specific meshes assigned by BiomeID.
-    // For V1 release, we use placeholder logic; full biome mesh tables in V1.5
-
+    // V1: Deterministic placement — place on walkable, buildable, non-water cells.
+    // Biome-specific mesh tables are V1.5; for now we count and log what WOULD be placed.
+    // NOTE FOR TESTERS: No visible geometry is placed in V1. This is by design.
+    //                   SpawnResourceNodes() is the functional path for resource nodes.
     int32 InstanceCount = 0;
-    
+
     for (int32 i = 0; i < Grid.Cells.Num(); ++i)
     {
         const FRTSCell& Cell = Grid.Cells[i];
-        
-        // Skip water, cliffs, bases, expansions, choke points
+
+        // Skip non-placeable cells
         if (!Cell.bWalkable || !Cell.bBuildable || Cell.bWater || Cell.bCliff)
         {
             continue;
         }
-        
-        // Skip cells that are already strategic zones (keep them clear)
-        if (Cell.TacticalZone == ERTSTacticalZone::MainBase ||
+
+        // Skip cells reserved for strategic zones
+        if (Cell.TacticalZone == ERTSTacticalZone::MainBase    ||
             Cell.TacticalZone == ERTSTacticalZone::NatExpansion ||
             Cell.TacticalZone == ERTSTacticalZone::ContestedExp ||
-            Cell.TacticalZone == ERTSTacticalZone::ChokePoint ||
+            Cell.TacticalZone == ERTSTacticalZone::ChokePoint   ||
             Cell.TacticalZone == ERTSTacticalZone::RiverCrossing)
         {
             continue;
         }
 
         // Density check: deterministic placement based on position hash + seed
-        float DensityThreshold = 0.15f; // 15% fill rate for V1
-        float PlacementHash = DeterministicRandFloat(Seed, i * 7919);
-        
+        const float DensityThreshold = 0.15f; // 15% fill rate for V1
+        const float PlacementHash    = DeterministicRandFloat(Seed, i * 7919);
+
         if (PlacementHash > DensityThreshold)
         {
             continue;
         }
 
-        // V1: We don't have actual meshes configured yet, so we just count what WOULD be placed
-        // In a real build, this adds to a HISM component keyed by biome-specific mesh
+        // V1 placeholder: biome mesh tables arrive in V1.5.
+        // Actual HISM AddInstance() calls go here once meshes are configured.
         ++InstanceCount;
     }
 
-    UE_LOG(LogTemp, Log, TEXT("RTSMapForge PropSpawner: %d instances would be placed (mesh setup pending)"), InstanceCount);
+    UE_LOG(LogTemp, Log, TEXT("RTSMapForge PropSpawner: %d prop slots computed (V1 — mesh assets not yet wired; no HISM instances placed)"), InstanceCount);
     return InstanceCount > 0;
 }
 
 void URTSPropSpawner::ClearProps()
 {
-    // Unregister and destroy all HISM components
+    // Unregister and destroy all HISM components explicitly
     for (auto& Pair : HISMComponents)
     {
         if (UHierarchicalInstancedStaticMeshComponent* HISM = Pair.Value)
@@ -95,7 +102,7 @@ void URTSPropSpawner::ClearProps()
     }
     HISMComponents.Empty();
 
-    // Destroy manager actor if it exists
+    // Destroy manager actor
     if (AActor* ExistingManager = ManagerActor.Get())
     {
         ExistingManager->Destroy();
@@ -105,6 +112,7 @@ void URTSPropSpawner::ClearProps()
 
 void URTSPropSpawner::Deinitialize()
 {
+    // Centralised teardown: always route through ClearProps()
     ClearProps();
 }
 
@@ -192,21 +200,21 @@ float URTSPropSpawner::DeterministicRandFloat(int64 Seed, int32 Index) const
 FTransform URTSPropSpawner::ComputePropTransform(const FRTSCell& Cell, float CellSize, int64 Seed, int32 Index) const
 {
     FVector Location = Cell.WorldPosition;
-    
-    // Jitter within cell
+
+    // Jitter within cell bounds
     float JitterX = (DeterministicRandFloat(Seed, Index * 3) - 0.5f) * CellSize * 0.6f;
     float JitterY = (DeterministicRandFloat(Seed, Index * 7) - 0.5f) * CellSize * 0.6f;
     Location.X += JitterX;
     Location.Y += JitterY;
-    
-    // Z height from terrain + slight offset
-    Location.Z += 50.0f; // Above ground
+
+    // Slight Z lift above terrain surface
+    Location.Z += 50.0f;
 
     // Scale variation
     float ScaleBase = 0.8f + DeterministicRandFloat(Seed, Index * 13) * 0.4f;
     FVector Scale(ScaleBase, ScaleBase, ScaleBase * (0.9f + DeterministicRandFloat(Seed, Index * 17) * 0.2f));
 
-    // Rotation
+    // Yaw rotation
     FRotator Rotation(0.0f, DeterministicRandFloat(Seed, Index * 23) * 360.0f, 0.0f);
 
     return FTransform(Rotation, Location, Scale);

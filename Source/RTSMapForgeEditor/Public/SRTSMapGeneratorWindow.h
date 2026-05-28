@@ -12,6 +12,10 @@ class URTSGenerationSettings;
  * Main Slate window for the RTS MapForge generator.
  * Provides parameter controls, generation trigger, overlay toggles,
  * minimap preview, and validation readout.
+ *
+ * FIX Problem 1: Generate button is disabled while IsGenerating() is true.
+ *               Tick() detects async completion and calls RefreshReadouts()
+ *               without blocking the editor thread.
  */
 class SRTSMapGeneratorWindow : public SCompoundWidget
 {
@@ -24,21 +28,21 @@ public:
 
 private:
     TWeakObjectPtr<URTSMapForgeEditorSubsystem> Subsystem;
-    TWeakObjectPtr<URTSGenerationSettings> Settings;
+    TWeakObjectPtr<URTSGenerationSettings>      Settings;
 
     // Preview brush — updated from subsystem texture
     FSlateBrush PreviewBrush;
-    FVector2D PreviewDesiredSize = FVector2D(256.0f, 256.0f);
+    FVector2D   PreviewDesiredSize = FVector2D(256.0f, 256.0f);
 
     // Overlay options for combo box
-    TArray<TSharedPtr<FString>> OverlayOptions;
-    TSharedPtr<FString> CurrentOverlayOption;
+    TArray<TSharedPtr<FString>>  OverlayOptions;
+    TSharedPtr<FString>          CurrentOverlayOption;
 
     // Cached readout strings
     FString ScoreText;
     FString ValidationText;
-    FString SeedText;
-    bool bLastHadGrid = false;
+    bool    bLastHadGrid   = false;
+    bool    bWasGenerating = false; // FIX Problem 1: Track generating state for Tick refresh
 
     void InitializeSettings();
     void RefreshReadouts();
@@ -51,6 +55,6 @@ private:
 
     TSharedRef<SWidget> MakeOverlayOptionWidget(TSharedPtr<FString> InOption);
 
-    static FString OverlayModeToString(ERTSDebugOverlayMode Mode);
+    static FString           OverlayModeToString(ERTSDebugOverlayMode Mode);
     static ERTSDebugOverlayMode StringToOverlayMode(const FString& Str);
 };

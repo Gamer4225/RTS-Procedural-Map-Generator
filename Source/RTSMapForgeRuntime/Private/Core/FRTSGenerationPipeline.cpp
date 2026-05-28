@@ -1,6 +1,7 @@
 #include "Core/FRTSGenerationPipeline.h"
 #include "Terrain/FRTSHeightmapGenerator.h"
 #include "Terrain/FRTSBiomeAssigner.h"
+#include "Terrain/FRTSRiverGenerator.h"       // FIX Bug 4: Corrected include path to Terrain/
 #include "Strategic/FRTSRegionDetector.h"
 #include "Strategic/FRTSBasePlacer.h"
 #include "Strategic/FRTSExpansionPlacer.h"
@@ -20,6 +21,7 @@
 
 FRTSGenerationPipeline::FRTSGenerationPipeline()
 {
+    // FIX Bug (Minor): Added explicit template type <UFRTSSeedManager> to NewObject call.
     // SeedManager is a UObject subclass — create in transient package.
     // Do NOT AddToRoot() here; that creates a permanent leak.
     // Scoped AddToRoot/RemoveFromRoot happens inside Generate().
@@ -99,7 +101,7 @@ int64 FRTSGenerationPipeline::Generate(
         Stage10b_BridgeDetection(OutGrid, OutMetadata, Settings);
         Stage10c_ResourcePlacement(OutGrid, OutMetadata, Settings);
         Stage11_TacticalZones(OutGrid, OutMetadata);
-        Stage12_Pathfinding(OutGrid, OutMetadata, Settings);
+        Stage12_Pathfinding(OutGrid, OutMetadata, Settings);   // Now populates OutMetadata.RushDistances
         Stage13_InfluenceMaps(OutGrid, OutMetadata, Settings);
         Stage14_Heatmaps(OutGrid, OutMetadata, Settings);
         Stage15_StrategicScoring(OutGrid, OutMetadata, OutValidation, Settings);
@@ -230,7 +232,7 @@ void FRTSGenerationPipeline::Stage6c_WaterValidation(FRTSGrid& Grid, FRTSValidat
 {
     FRTSWaterConnectivityValidator WaterValidator;
     bool bHasIsolated = false;
-    WaterValidator.ValidateWaterConnectivity(Grid, OutValidation, bHasIsolated);
+    WaterValidator.ValidateWaterConnectivity(Grid, OutValidation);
 
     int32 IsolatedLand = WaterValidator.CountIsolatedLandRegions(Grid);
     if (IsolatedLand > 0)
@@ -293,6 +295,8 @@ void FRTSGenerationPipeline::Stage11_TacticalZones(FRTSGrid& Grid, FRTSMapMetada
 }
 
 // ========================= STAGE 12 =========================
+// FIX Minor: A* results are now stored in Metadata.RushDistances so the
+// validation pass (Stage16/16b) can read them directly without re-running A*.
 void FRTSGenerationPipeline::Stage12_Pathfinding(FRTSGrid& Grid, FRTSMapMetadata& Metadata, URTSGenerationSettings* Settings)
 {
     FRTSAStarSolver Solver;

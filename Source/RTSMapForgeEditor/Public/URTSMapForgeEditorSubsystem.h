@@ -11,6 +11,10 @@
 /**
  * Editor-only subsystem that owns the generated grid state,
  * preview texture, and overlay mode. Survives between PIE sessions.
+ *
+ * FIX Problem 1: GenerateMap() is now async — it dispatches generation to a
+ * background thread and marshals UObject writes back to the game thread.
+ * bIsGenerating prevents double-generation while a job is running.
  */
 UCLASS()
 class RTSMAPFORGEEDITOR_API URTSMapForgeEditorSubsystem : public UEditorSubsystem
@@ -22,8 +26,15 @@ public:
     virtual void Deinitialize() override;
 
     // === Generation ===
+
+    // FIX Problem 1: Now async. Returns immediately; listen for bIsGenerating
+    // transitioning false (or poll HasValidGrid()) to know when results are ready.
     UFUNCTION(BlueprintCallable, Category = "RTSMapForge|Editor")
     void GenerateMap(class URTSGenerationSettings* Settings);
+
+    // Returns true if a generation job is currently in flight.
+    UFUNCTION(BlueprintCallable, Category = "RTSMapForge|Editor", BlueprintPure)
+    bool IsGenerating() const { return bIsGenerating; }
 
     UFUNCTION(BlueprintCallable, Category = "RTSMapForge|Editor")
     bool HasValidGrid() const;
@@ -49,7 +60,7 @@ public:
     FORCEINLINE const FRTSGrid& GetGrid() const { return CurrentGrid; }
 
     UFUNCTION(BlueprintCallable, Category = "RTSMapForge|Editor")
-    FRTSValidationResult GetLastValidation() const { return LastValidation; }
+    FRTSValidationResult GetLastValidation() const { return LastValidationResult; }
 
     UFUNCTION(BlueprintCallable, Category = "RTSMapForge|Editor")
     FRTSMapMetadata GetLastMetadata() const { return LastMetadata; }
@@ -65,12 +76,15 @@ private:
     FRTSMapMetadata LastMetadata;
 
     UPROPERTY()
-    FRTSValidationResult LastValidation;
+    FRTSValidationResult LastValidationResult;
 
     UPROPERTY()
     TObjectPtr<UTexture2D> PreviewTexture;
 
     ERTSDebugOverlayMode CurrentOverlayMode = ERTSDebugOverlayMode::Heightmap;
+
+    // FIX Problem 1: Guards against double-generation while async task is running.
+    std::atomic<bool> bIsGenerating{ false };
 
     void CreatePreviewTexture(int32 Width, int32 Height);
 };
