@@ -1,15 +1,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "FRTSCell.h"
+#include "Core/FRTSCell.h"
 #include "FRTSGrid.generated.h"
 
 /**
  * Container for the entire map grid. Flat array storage for cache locality.
  * All indexing is [Y * Width + X].
- * 
+ *
  * CRITICAL DESIGN: No per-cell dynamic allocations. Neighbors are computed on-the-fly.
- * Bounds-checked in Debug builds via check() macros.
+ * Bounds-checked in Debug builds via checkf() macros.
  */
 USTRUCT(BlueprintType)
 struct RTSMAPFORGERUNTIME_API FRTSGrid

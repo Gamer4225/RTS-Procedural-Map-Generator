@@ -1,0 +1,29 @@
+{
+    "FileVersion": 3,
+    "Version": 1,
+    "VersionName": "1.5.0",
+    "FriendlyName": "RTSMapForge",
+    "Description": "A procedural map generation plugin for RTS games. Generates balanced, competitive maps with terrain, biomes, rivers, strategic zones, and validation.",
+    "Category": "Gameplay",
+    "CreatedBy": "Gamer4225",
+    "CreatedByURL": "https://github.com/Gamer4225/RTS-Procedural-Map-Generator",
+    "DocsURL": "",
+    "MarketplaceURL": "",
+    "SupportURL": "",
+    "CanContainContent": false,
+    "IsBetaVersion": true,
+    "IsExperimentalVersion": false,
+    "Installed": false,
+    "Modules": [
+        {
+            "Name": "RTSMapForgeRuntime",
+            "Type": "Runtime",
+            "LoadingPhase": "Default"
+        },
+        {
+            "Name": "RTSMapForgeEditor",
+            "Type": "Editor",
+            "LoadingPhase": "PostEngineInit"
+        }
+    ]
+}

@@ -60,7 +60,6 @@ public:
     int32 NumExpansions = 3;
 
     // === BIOMES ===
-    // Stored as soft references or direct pointers; using direct for V1 simplicity
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Biomes")
     TArray<TSoftObjectPtr<class URTSBiomeAsset>> Biomes;
 
@@ -84,6 +83,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "RTSMapForge|Settings")
     float GetMapDiagonal() const;
 
+    // CRITICAL: Called EXACTLY ONCE per generation, inside FRTSGenerationPipeline::Generate().
+    // No other code may call this.
     UFUNCTION(BlueprintCallable, Category = "RTSMapForge|Settings")
     int64 ResolveSeed() const;
 };

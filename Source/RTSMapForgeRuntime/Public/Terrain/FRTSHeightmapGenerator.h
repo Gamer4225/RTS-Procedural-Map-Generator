@@ -1,5 +1,4 @@
 #pragma once
-
 #include "CoreMinimal.h"
 #include "Core/FRTSGrid.h"
 #include "Terrain/FRTSNoiseGenerator.h"
@@ -8,10 +7,9 @@
 /**
  * Generates normalized heightmap data (0..1) into FRTSGrid using FBM noise.
  * Supports optional island-style radial falloff.
- * 
+ *
  * CRITICAL: Seed offsets are passed explicitly (int64 InSeed).
  * Generators must NEVER call Settings->ResolveSeed() internally.
- * Seed resolution is owned by the pipeline entry point ONLY.
  */
 class RTSMAPFORGERUNTIME_API FRTSHeightmapGenerator
 {

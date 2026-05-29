@@ -5,6 +5,9 @@
 /**
  * Deterministic noise generator using classic Perlin noise with FBM compositing.
  * All random permutation table generation is seeded externally.
+ *
+ * CRITICAL: Generators must NEVER call Settings->ResolveSeed() internally.
+ * Seed resolution is owned exclusively by FRTSGenerationPipeline::Generate().
  */
 class RTSMAPFORGERUNTIME_API FRTSNoiseGenerator
 {
