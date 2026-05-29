@@ -8,12 +8,12 @@ void FRTSHeightmapGenerator::Generate(FRTSGrid& Grid, const URTSGenerationSettin
         return;
     }
 
-    const int32 W = Grid.Width;
-    const int32 H = Grid.Height;
-    const float Scale = Settings->TerrainScale;
-    const int32 Octaves = Settings->FBMOctaves;
+    const int32 W           = Grid.Width;
+    const int32 H           = Grid.Height;
+    const float Scale       = Settings->TerrainScale;
+    const int32 Octaves     = Settings->FBMOctaves;
     const float Persistence = Settings->FBMPersistence;
-    const float Lacunarity = Settings->FBMLacunarity;
+    const float Lacunarity  = Settings->FBMLacunarity;
 
     // Use deterministic offsets derived from the ALREADY-RESOLVED seed.
     // CRITICAL: Generators must NEVER call Settings->ResolveSeed() internally.
@@ -29,6 +29,7 @@ void FRTSHeightmapGenerator::Generate(FRTSGrid& Grid, const URTSGenerationSettin
             float NY = static_cast<float>(Y) / static_cast<float>(H) * Scale;
 
             float RawHeight = Noise.SeededFBM(NX, NY, Octaves, Persistence, Lacunarity, OffsetX, OffsetY);
+
             // Map from [-1, 1] -> [0, 1]
             float Normalized = (RawHeight + 1.0f) * 0.5f;
             Normalized = FMath::Clamp(Normalized, 0.0f, 1.0f);
@@ -48,18 +49,18 @@ void FRTSHeightmapGenerator::ApplyRadialFalloff(FRTSGrid& Grid, float FalloffStr
         return;
     }
 
-    const int32 W = Grid.Width;
-    const int32 H = Grid.Height;
-    const float CenterX = (W - 1) * 0.5f;
-    const float CenterY = (H - 1) * 0.5f;
-    const float MaxDist = FMath::Sqrt(CenterX * CenterX + CenterY * CenterY);
+    const int32 W        = Grid.Width;
+    const int32 H        = Grid.Height;
+    const float CenterX  = (W - 1) * 0.5f;
+    const float CenterY  = (H - 1) * 0.5f;
+    const float MaxDist  = FMath::Sqrt(CenterX * CenterX + CenterY * CenterY);
 
     for (int32 Y = 0; Y < H; ++Y)
     {
         for (int32 X = 0; X < W; ++X)
         {
-            float DX = static_cast<float>(X) - CenterX;
-            float DY = static_cast<float>(Y) - CenterY;
+            float DX   = static_cast<float>(X) - CenterX;
+            float DY   = static_cast<float>(Y) - CenterY;
             float Dist = FMath::Sqrt(DX * DX + DY * DY) / MaxDist;
 
             // Smoothstep falloff from edges
@@ -76,12 +77,9 @@ void FRTSHeightmapGenerator::ApplyRadialFalloff(FRTSGrid& Grid, float FalloffStr
 
 void FRTSHeightmapGenerator::ComputeSlopes(FRTSGrid& Grid)
 {
-    const int32 W = Grid.Width;
-    const int32 H = Grid.Height;
-
-    for (int32 Y = 0; Y < H; ++Y)
+    for (int32 Y = 0; Y < Grid.Height; ++Y)
     {
-        for (int32 X = 0; X < W; ++X)
+        for (int32 X = 0; X < Grid.Width; ++X)
         {
             FRTSCell& Cell = Grid.GetCell(X, Y);
             Cell.Slope = ComputeSlopeAt(Grid, X, Y);
@@ -91,8 +89,8 @@ void FRTSHeightmapGenerator::ComputeSlopes(FRTSGrid& Grid)
 
 float FRTSHeightmapGenerator::ComputeSlopeAt(const FRTSGrid& Grid, int32 X, int32 Y) const
 {
-    const int32 W = Grid.Width;
-    const int32 H = Grid.Height;
+    const int32 W        = Grid.Width;
+    const int32 H        = Grid.Height;
     const float CellSize = Grid.CellSize;
 
     float HCenter = Grid.GetCell(X, Y).Height;
@@ -102,7 +100,7 @@ float FRTSHeightmapGenerator::ComputeSlopeAt(const FRTSGrid& Grid, int32 X, int3
     float HDown   = (Y < H - 1) ? Grid.GetCell(X, Y + 1).Height : HCenter;
 
     float dX = (HRight - HLeft) * 0.5f;
-    float dY = (HDown - HUp) * 0.5f;
+    float dY = (HDown  - HUp  ) * 0.5f;
 
     float Gradient = FMath::Sqrt(dX * dX + dY * dY) / CellSize;
     return FMath::Atan(Gradient);
