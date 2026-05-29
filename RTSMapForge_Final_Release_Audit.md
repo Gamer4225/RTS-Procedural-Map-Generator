@@ -89,5 +89,3 @@ Current state:
 
 Remaining practical step before Fab submission:
 - Run a full Unreal Editor build and a live bake/overlay smoke test in the target UE version you plan to ship.
-
-
